@@ -1,4 +1,4 @@
-const CACHE = 'nba-tracker-v1';
+const CACHE = 'sports-tracker-v3';
 const ASSETS = ['/', '/index.html', '/app.js', '/style.css', '/manifest.json'];
 
 self.addEventListener('install', e => {
@@ -17,8 +17,6 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-
-  // API calls: network first, no cache
   if (url.pathname.startsWith('/api/')) {
     e.respondWith(
       fetch(e.request).catch(() =>
@@ -29,9 +27,14 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
-
-  // Static assets: cache first, fallback to network
+  // Network first for HTML/JS/CSS so updates always get through
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    fetch(e.request)
+      .then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
