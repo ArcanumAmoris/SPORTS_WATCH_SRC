@@ -47,10 +47,13 @@ const PLATFORM_COLORS = {
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let followed   = new Set(JSON.parse(localStorage.getItem('nba_followed') || '[]'));
-let allGames   = [];
-let currentTab = 'my';
-let refreshTimer;
+let followed      = new Set(JSON.parse(localStorage.getItem('nba_followed') || '[]'));
+let allGames      = [];
+let prevScores    = {}; // gameId -> {home: n, away: n} for change detection
+let currentTab    = 'my';
+const REFRESH_SEC = 120;
+let countdown     = REFRESH_SEC;
+let countdownTimer;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -60,13 +63,49 @@ document.addEventListener('DOMContentLoaded', () => {
   setDatePill();
   renderTeamGrid();
   loadGames();
-  // Refresh every 2 minutes while page is open
-  refreshTimer = setInterval(loadGames, 2 * 60 * 1000);
-  // Also refresh when tab becomes visible again
+  startCountdown();
+  // Refresh when tab becomes visible again after being hidden
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) loadGames();
+    if (!document.hidden) { loadGames(); resetCountdown(); }
   });
 });
+
+function startCountdown() {
+  clearInterval(countdownTimer);
+  countdown = REFRESH_SEC;
+  updateCountdownUI();
+  countdownTimer = setInterval(() => {
+    countdown--;
+    if (countdown <= 0) {
+      loadGames();
+      countdown = REFRESH_SEC;
+    }
+    updateCountdownUI();
+  }, 1000);
+}
+
+function resetCountdown() {
+  countdown = REFRESH_SEC;
+  updateCountdownUI();
+}
+
+function updateCountdownUI() {
+  const el = document.getElementById('refreshCountdown');
+  if (!el) return;
+  const anyLive = allGames.some(g => g.status === 'inprogress');
+  if (!anyLive) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  const mins = Math.floor(countdown / 60);
+  const secs = String(countdown % 60).padStart(2, '0');
+  el.querySelector('.cd-time').textContent = mins > 0 ? `${mins}:${secs}` : `0:${secs}`;
+  // Animate SVG ring — circumference 47.1, drain from full to empty
+  const ring = document.getElementById('cdRing');
+  if (ring) {
+    const pct = countdown / REFRESH_SEC;
+    ring.style.strokeDashoffset = (47.1 * (1 - pct)).toFixed(2);
+  }
+  el.classList.toggle('cd-imminent', countdown <= 10);
+}
 
 function setDatePill() {
   const d = new Date().toLocaleDateString('en-US', {
@@ -82,9 +121,22 @@ async function loadGames() {
     const res = await fetch('/api/games');
     const json = await res.json();
     if (!json.ok) throw new Error(json.error);
+
+    // Detect score changes before updating state
+    const changed = new Set();
+    (json.games || []).forEach(g => {
+      if (g.status === 'inprogress' && g.score && prevScores[g.id]) {
+        const prev = prevScores[g.id];
+        if (prev.home !== g.score[g.home] || prev.away !== g.score[g.away]) {
+          changed.add(g.id);
+        }
+      }
+      if (g.score) prevScores[g.id] = { home: g.score[g.home], away: g.score[g.away] };
+    });
+
     allGames = json.games || [];
     updatePlayingDots();
-    renderGames();
+    renderGames(changed);
   } catch (e) {
     if (allGames.length === 0) {
       document.getElementById('gamesContainer').innerHTML =
@@ -160,7 +212,7 @@ function setTab(tab) {
 }
 
 // ── Game rendering ────────────────────────────────────────────────────────────
-function renderGames() {
+function renderGames(changed = new Set()) {
   const container   = document.getElementById('gamesContainer');
   const tabSwitcher = document.getElementById('tabSwitcher');
   const gamesTitle  = document.getElementById('gamesTitle');
@@ -192,6 +244,21 @@ function renderGames() {
   }
 
   container.innerHTML = games.map((g, i) => gameCard(g, i)).join('');
+
+  // Flash scores on cards where score changed
+  if (changed.size > 0) {
+    games.forEach(g => {
+      if (changed.has(g.id)) {
+        const card = container.querySelector(`[data-game-id="${g.id}"]`);
+        if (card) {
+          const scoreEl = card.querySelector('.score-nums');
+          if (scoreEl) { scoreEl.classList.add('score-flash'); setTimeout(() => scoreEl.classList.remove('score-flash'), 1200); }
+        }
+      }
+    });
+  }
+
+  updateCountdownUI();
 }
 
 function gameCard(g, idx) {
@@ -230,7 +297,7 @@ function gameCard(g, idx) {
 
   const delayStyle = `animation-delay:${idx * 60}ms`;
 
-  return `<div class="game-card${isLive?' live':''}" style="${delayStyle}">
+  return `<div class="game-card${isLive?" live":""}" data-game-id="${g.id}" style="${delayStyle}">
     <div class="card-top">${statusBadge}${timeStr}</div>
     <div class="matchup">
       <div class="team-side">
