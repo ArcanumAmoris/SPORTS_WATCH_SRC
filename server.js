@@ -15,18 +15,23 @@ app.use(express.static(path.join(__dirname, 'public'), {
   }
 }));
 
+// ─── Platform metadata ────────────────────────────────────────────────────────
 const PLATFORM_META = {
-  'ESPN':        { url: 'https://www.espn.com/watch',          color: '#E60000' },
-  'ESPN2':       { url: 'https://www.espn.com/watch',          color: '#E60000' },
-  'ABC':         { url: 'https://www.espn.com/watch',          color: '#006AB3' },
-  'TNT':         { url: 'https://www.tntdrama.com/sports',     color: '#E4002B' },
-  'TBS':         { url: 'https://www.tbs.com/sports',          color: '#E4002B' },
-  'truTV':       { url: 'https://www.trutv.com',               color: '#E4002B' },
-  'NBC':         { url: 'https://www.nbc.com/live',            color: '#0A5FA8' },
-  'Peacock':     { url: 'https://www.peacocktv.com/sports',    color: '#2C2C2C' },
-  'Max':         { url: 'https://www.max.com/sports',          color: '#002BE7' },
-  'NBA TV':      { url: 'https://www.nba.com/watch',           color: '#1D428A' },
-  'NBA League Pass': { url: 'https://www.nba.com/watch',       color: '#1D428A' },
+  'ESPN':            { url: 'https://www.espn.com/watch',            color: '#E60000' },
+  'ESPN2':           { url: 'https://www.espn.com/watch',            color: '#E60000' },
+  'ABC':             { url: 'https://www.espn.com/watch',            color: '#006AB3' },
+  'TNT':             { url: 'https://www.tntdrama.com/sports',       color: '#E4002B' },
+  'TBS':             { url: 'https://www.tbs.com/sports',            color: '#E4002B' },
+  'truTV':           { url: 'https://www.trutv.com',                 color: '#E4002B' },
+  'NBC':             { url: 'https://www.nbc.com/live',              color: '#0A5FA8' },
+  'Peacock':         { url: 'https://www.peacocktv.com/sports',      color: '#2C2C2C' },
+  'Max':             { url: 'https://www.max.com/sports',            color: '#002BE7' },
+  'NBA TV':          { url: 'https://www.nba.com/watch',             color: '#1D428A' },
+  'NBA League Pass': { url: 'https://www.nba.com/watch',             color: '#1D428A' },
+  'MLB.TV':          { url: 'https://www.mlb.com/tv',                color: '#002D72' },
+  'FS1':             { url: 'https://www.foxsports.com/live',        color: '#E4002B' },
+  'FS2':             { url: 'https://www.foxsports.com/live',        color: '#E4002B' },
+  'Apple TV+':       { url: 'https://tv.apple.com/channel/tvs.sbd.4000', color: '#555' },
 };
 
 function getPlatformMeta(name) {
@@ -36,115 +41,166 @@ function getPlatformMeta(name) {
       return { name: key, ...val };
     }
   }
-  return { name, url: 'https://www.nba.com/watch', color: '#1D428A' };
+  // Filter out regional/team-specific channels (e.g. "Rays.TV", "CLEGuardians.TV")
+  if (name.includes('.TV') || name.includes('SN ') || name.includes('NESN') || name.includes('CHSN')) {
+    return { name, url: 'https://www.mlb.com/tv', color: '#002D72' };
+  }
+  return { name, url: 'https://www.espn.com/watch', color: '#666' };
 }
 
-let cache = { data: null, ts: 0 };
-const CACHE_TTL = 60 * 1000;
+// ─── ESPN fetch helper ────────────────────────────────────────────────────────
+const ESPN_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+  'Accept': 'application/json',
+};
 
-async function fetchGamesFromESPN() {
-  const url = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard';
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
-      'Accept': 'application/json',
-    }
-  });
-  if (!res.ok) throw new Error(`ESPN API error: ${res.status}`);
+async function espnFetch(sport, league) {
+  const url = `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/scoreboard`;
+  const res = await fetch(url, { headers: ESPN_HEADERS });
+  if (!res.ok) throw new Error(`ESPN ${league} error: ${res.status}`);
   return res.json();
 }
 
-function parseESPN(data) {
-  return (data.events || []).map(event => {
-    const comp       = event.competitions[0];
-    const status     = comp.status;
-    const statusType = status.type;
+// ─── Parse ESPN event → unified game object ───────────────────────────────────
+function parseEvent(event, sport) {
+  const comp       = event.competitions[0];
+  const status     = comp.status;
+  const statusType = status.type;
 
-    const homeTeam = comp.competitors.find(c => c.homeAway === 'home');
-    const awayTeam = comp.competitors.find(c => c.homeAway === 'away');
+  const homeTeam = comp.competitors.find(c => c.homeAway === 'home');
+  const awayTeam = comp.competitors.find(c => c.homeAway === 'away');
 
-    const home = homeTeam?.team?.abbreviation || 'TBD';
-    const away = awayTeam?.team?.abbreviation || 'TBD';
+  const home = homeTeam?.team?.abbreviation || 'TBD';
+  const away = awayTeam?.team?.abbreviation || 'TBD';
 
-    let gameStatus = 'scheduled';
-    if (statusType.state === 'in')        gameStatus = 'inprogress';
-    else if (statusType.state === 'post') gameStatus = 'closed';
+  let gameStatus = 'scheduled';
+  if (statusType.state === 'in')        gameStatus = 'inprogress';
+  else if (statusType.state === 'post') gameStatus = 'closed';
 
-    let score = null;
-    if (gameStatus === 'inprogress' || gameStatus === 'closed') {
-      score = {
-        [home]: parseInt(homeTeam?.score || '0', 10),
-        [away]: parseInt(awayTeam?.score || '0', 10),
+  let score = null;
+  if (gameStatus === 'inprogress' || gameStatus === 'closed') {
+    score = {
+      [home]: parseInt(homeTeam?.score || '0', 10),
+      [away]: parseInt(awayTeam?.score || '0', 10),
+    };
+  }
+
+  const period = status.period || null;
+
+  // Sport-specific period label
+  let periodLabel = null;
+  if (gameStatus === 'inprogress' && period) {
+    if (sport === 'basketball') {
+      if (statusType.description === 'Halftime') periodLabel = 'Half';
+      else periodLabel = period > 4 ? `OT${period - 4 > 1 ? period - 4 : ''}` : `Q${period}`;
+    } else if (sport === 'baseball') {
+      // Top/bottom from situation
+      const sit = comp.situation || {};
+      const half = sit.onFirst !== undefined
+        ? (comp.status.period && (statusType.description || '').toLowerCase().includes('bot') ? '▼' : '▲')
+        : '';
+      periodLabel = `${half}${period}`;
+    }
+  }
+  if (statusType.description === 'Final' || statusType.description === 'Game Over') {
+    periodLabel = null;
+  }
+
+  // Situation (MLB-specific: balls, strikes, outs, runners)
+  let situation = null;
+  if (sport === 'baseball' && gameStatus === 'inprogress') {
+    const sit = comp.situation || {};
+    if (sit.balls !== undefined) {
+      situation = {
+        balls:    sit.balls,
+        strikes:  sit.strikes,
+        outs:     sit.outs,
+        onFirst:  sit.onFirst  || false,
+        onSecond: sit.onSecond || false,
+        onThird:  sit.onThird  || false,
       };
     }
+  }
 
-    const period = status.period || null;
-    const clock  = status.displayClock || null;
+  // Streams — filter to national only for cleanliness, keep regional as fallback
+  const broadcasts = comp.broadcasts || [];
+  const streams = [];
+  const seen = new Set();
+  const regional = [];
 
-    let quarterLabel = null;
-    if (gameStatus === 'inprogress' && period) {
-      if (statusType.description === 'Halftime') {
-        quarterLabel = 'Half';
-      } else {
-        quarterLabel = period > 4 ? `OT${period - 4 > 1 ? period - 4 : ''}` : `Q${period}`;
-      }
-    }
-
-    const broadcasts = comp.broadcasts || [];
-    const streams = [];
-    const seen = new Set();
-    broadcasts.forEach(b => {
-      (b.names || []).forEach(name => {
-        if (!seen.has(name)) {
-          seen.add(name);
-          streams.push(getPlatformMeta(name));
-        }
-      });
+  broadcasts.forEach(b => {
+    (b.names || []).forEach(name => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      const meta = getPlatformMeta(name);
+      // Heuristic: regional if contains team name pattern or known regional markers
+      const isRegional = name.includes('.TV') || name.includes('NESN') ||
+        name.includes('CHSN') || name.includes('SN ') ||
+        name.includes('FanDuel SN') || name.match(/^[A-Z]{2,3}SN/);
+      if (isRegional) regional.push(meta);
+      else streams.push(meta);
     });
-    if (!seen.has('NBA League Pass')) {
-      streams.push(getPlatformMeta('NBA League Pass'));
-    }
-
-    const scheduledDate = new Date(comp.date || event.date);
-    const localTime = scheduledDate.toLocaleTimeString('en-US', {
-      timeZone: 'America/New_York',
-      hour: 'numeric', minute: '2-digit', hour12: true
-    }) + ' ET';
-
-    const notes = comp.notes || [];
-    const seriesInfo = notes.find(n => n.type === 'event')?.headline || null;
-
-    return {
-      id:        comp.id || event.id,
-      home,
-      away,
-      homeName:  homeTeam?.team?.displayName || home,
-      awayName:  awayTeam?.team?.displayName || away,
-      status:    gameStatus,
-      scheduled: comp.date || event.date,
-      localTime,
-      quarter:   quarterLabel,
-      clock,
-      score,
-      streams,
-      seriesInfo,
-    };
   });
+
+  // Always add league streaming fallback
+  const fallback = sport === 'baseball'
+    ? getPlatformMeta('MLB.TV')
+    : getPlatformMeta('NBA League Pass');
+  if (!seen.has(fallback.name)) streams.push(fallback);
+
+  // Add one regional if no national found
+  if (streams.length <= 1 && regional.length > 0) streams.unshift(regional[0]);
+
+  const scheduledDate = new Date(comp.date || event.date);
+  const localTime = scheduledDate.toLocaleTimeString('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric', minute: '2-digit', hour12: true
+  }) + ' ET';
+
+  const notes = comp.notes || [];
+  const seriesInfo = notes.find(n => n.type === 'event')?.headline || null;
+
+  return {
+    id:          comp.id || event.id,
+    sport,
+    home,
+    away,
+    homeName:    homeTeam?.team?.displayName || home,
+    awayName:    awayTeam?.team?.displayName || away,
+    status:      gameStatus,
+    scheduled:   comp.date || event.date,
+    localTime,
+    periodLabel,
+    score,
+    situation,
+    streams,
+    seriesInfo,
+  };
 }
 
-async function getSchedule() {
+// ─── Cache (per sport) ────────────────────────────────────────────────────────
+const caches = { basketball: { data: null, ts: 0 }, baseball: { data: null, ts: 0 } };
+const CACHE_TTL = 60 * 1000;
+
+async function getGames(sport, league) {
   const now = Date.now();
-  if (cache.data && now - cache.ts < CACHE_TTL) return cache.data;
-  const raw   = await fetchGamesFromESPN();
-  const games = parseESPN(raw);
-  cache = { data: games, ts: now };
+  const c = caches[sport];
+  if (c.data && now - c.ts < CACHE_TTL) return c.data;
+  const raw   = await espnFetch(sport, league);
+  const games = (raw.events || []).map(e => parseEvent(e, sport));
+  c.data = games;
+  c.ts   = now;
   return games;
 }
 
+// ─── Routes ───────────────────────────────────────────────────────────────────
 app.get('/api/games', async (req, res) => {
   try {
-    const games = await getSchedule();
-    res.json({ ok: true, games, updatedAt: new Date().toISOString() });
+    const [nba, mlb] = await Promise.all([
+      getGames('basketball', 'nba'),
+      getGames('baseball',   'mlb'),
+    ]);
+    res.json({ ok: true, nba, mlb, updatedAt: new Date().toISOString() });
   } catch (err) {
     console.error('ESPN fetch error:', err.message);
     res.status(500).json({ ok: false, error: err.message });
@@ -155,4 +211,4 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => console.log(`NBA Tracker on port ${PORT} — live data from ESPN`));
+app.listen(PORT, () => console.log(`Sports Tracker on port ${PORT} — NBA + MLB via ESPN`));
