@@ -407,6 +407,30 @@ body {
   height: env(safe-area-inset-bottom, 16px);
 }
 
+/* Refresh countdown */
+.refresh-countdown {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--green);
+  opacity: 0.8;
+}
+
+.refresh-countdown.cd-imminent { opacity: 1; }
+.refresh-countdown.cd-imminent #cdRing { stroke: #facc15; }
+.refresh-countdown.cd-imminent .cd-time { color: #facc15; }
+
+/* Score flash animation when score updates */
+@keyframes scoreFlash {
+  0%   { color: var(--green); transform: scale(1.08); }
+  60%  { color: var(--green); transform: scale(1.04); }
+  100% { color: var(--text);  transform: scale(1); }
+}
+
+.score-flash { animation: scoreFlash 1.2s ease forwards; }
+
 /* No games tonight state */
 .no-games {
   color: var(--muted);
