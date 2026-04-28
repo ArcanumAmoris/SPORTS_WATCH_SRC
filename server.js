@@ -73,7 +73,7 @@ async function fetchFromSR(path) {
 
 // ─── Cache ────────────────────────────────────────────────────────────────────
 let cache = { data: null, ts: 0 };
-const CACHE_TTL = 5 * 60 * 1000; // 5 min
+const CACHE_TTL = 90 * 1000; // 90 seconds — keeps live scores fresh
 
 async function getSchedule() {
   const now = Date.now();
