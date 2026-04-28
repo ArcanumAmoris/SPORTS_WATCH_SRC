@@ -5,33 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="NBA Tracker" />
+  <meta name="apple-mobile-web-app-title" content="Sports Tracker" />
   <meta name="theme-color" content="#0a0a0f" />
-  <meta name="description" content="Follow your NBA teams. See where to watch tonight." />
-
-  <title>NBA Tracker</title>
-
+  <meta name="description" content="Follow your NBA & MLB teams. See where to watch tonight." />
+  <title>Sports Tracker</title>
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
   <link rel="stylesheet" href="/style.css" />
-
-  <!-- Apple splash screens (optional — add more sizes as needed) -->
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
+<div id="app">
 
-  <div id="app">
-    <header class="top-bar">
-      <div class="logo">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" fill="#C9082A"/>
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#C9082A"/>
-          <path d="M12 2v20M2 12h20M5.5 5.5c1.8 1.8 2.5 4.2 2.5 6.5s-.7 4.7-2.5 6.5M18.5 5.5C16.7 7.3 16 9.7 16 12s.7 4.7 2.5 6.5" stroke="white" stroke-width="1.2" fill="none"/>
-          <circle cx="12" cy="12" r="10" stroke="white" stroke-width="1.2" fill="none"/>
-        </svg>
-        NBA Tracker
-      </div>
-      <div class="date-pill" id="datePill">—</div>
+  <header class="top-bar">
+    <div class="logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" fill="#C9082A"/>
+        <path d="M12 2v20M2 12h20M5.5 5.5c1.8 1.8 2.5 4.2 2.5 6.5s-.7 4.7-2.5 6.5M18.5 5.5C16.7 7.3 16 9.7 16 12s.7 4.7 2.5 6.5" stroke="white" stroke-width="1.2"/>
+        <circle cx="12" cy="12" r="10" stroke="white" stroke-width="1.2"/>
+      </svg>
+      Sports Tracker
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
       <div class="refresh-countdown" id="refreshCountdown" style="display:none">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
           <circle cx="9" cy="9" r="7.5" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"/>
@@ -41,41 +35,46 @@
         </svg>
         <span class="cd-time">2:00</span>
       </div>
-    </header>
-
-    <div class="scroll-body">
-
-      <!-- Team picker -->
-      <section class="section">
-        <div class="section-head">
-          <span class="section-title">YOUR TEAMS</span>
-          <button class="text-btn" id="clearBtn" onclick="clearAll()">Clear</button>
-        </div>
-        <div class="team-grid" id="teamGrid"></div>
-      </section>
-
-      <!-- Games -->
-      <section class="section">
-        <div class="section-head">
-          <span class="section-title" id="gamesTitle">TONIGHT</span>
-          <div class="tab-switcher" id="tabSwitcher" style="display:none">
-            <button class="tab active" id="tab-my" onclick="setTab('my')">My Teams</button>
-            <button class="tab" id="tab-all" onclick="setTab('all')">All</button>
-          </div>
-        </div>
-        <div id="gamesContainer">
-          <div class="loading-block">
-            <div class="spinner"></div>
-            <span>Loading tonight's games…</span>
-          </div>
-        </div>
-      </section>
-
+      <div class="date-pill" id="datePill">—</div>
     </div>
+  </header>
 
-    <div class="bottom-safe"></div>
+  <!-- League switcher -->
+  <div class="league-switcher">
+    <button class="league-btn active" id="league-nba" onclick="setLeague('nba')">
+      <span class="league-icon">🏀</span> NBA
+    </button>
+    <button class="league-btn" id="league-mlb" onclick="setLeague('mlb')">
+      <span class="league-icon">⚾</span> MLB
+    </button>
   </div>
 
-  <script src="/app.js"></script>
+  <div class="scroll-body">
+
+    <section class="section">
+      <div class="section-head">
+        <span class="section-title" id="teamSectionTitle">YOUR TEAMS</span>
+        <button class="text-btn" id="clearBtn" onclick="clearAll()">Clear</button>
+      </div>
+      <div class="team-grid" id="teamGrid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <span class="section-title" id="gamesTitle">TONIGHT</span>
+        <div class="tab-switcher" id="tabSwitcher" style="display:none">
+          <button class="tab active" id="tab-my"  onclick="setTab('my')">My Teams</button>
+          <button class="tab"        id="tab-all" onclick="setTab('all')">All</button>
+        </div>
+      </div>
+      <div id="gamesContainer">
+        <div class="loading-block"><div class="spinner"></div><span>Loading games…</span></div>
+      </div>
+    </section>
+
+  </div>
+  <div class="bottom-safe"></div>
+</div>
+<script src="/app.js"></script>
 </body>
 </html>
