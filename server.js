@@ -1,208 +1,158 @@
 const express = require('express');
-const cors = require('cors');
-const path = require('path');
+const cors    = require('cors');
+const path    = require('path');
 
-const app = express();
+const app  = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.js'))  res.setHeader('Content-Type', 'application/javascript');
-    if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
-    if (filePath.endsWith('.svg')) res.setHeader('Content-Type', 'image/svg+xml');
-    if (filePath.endsWith('.json') && !filePath.endsWith('manifest.json'))
-      res.setHeader('Content-Type', 'application/json');
+    if (filePath.endsWith('.js'))   res.setHeader('Content-Type', 'application/javascript');
+    if (filePath.endsWith('.css'))  res.setHeader('Content-Type', 'text/css');
+    if (filePath.endsWith('.svg'))  res.setHeader('Content-Type', 'image/svg+xml');
   }
 }));
 
-// ─── Streaming platform data ──────────────────────────────────────────────────
-// NBA playoff broadcast rights 2025-26:
-//   National: ESPN/ABC, TNT/TruTV, NBA League Pass
-//   Streaming: Max (TNT games), ESPN+ (ESPN games), Peacock (select)
-const BROADCAST_MAP = {
-  TNT:    { name: 'TNT / Max',      url: 'https://www.max.com/sports',       color: '#E4002B' },
-  ESPN:   { name: 'ESPN',           url: 'https://www.espn.com/watch',        color: '#E60000' },
-  ABC:    { name: 'ABC / ESPN+',    url: 'https://www.espn.com/watch',        color: '#006AB3' },
-  NBATV:  { name: 'NBA TV',         url: 'https://www.nba.com/watch',         color: '#1D428A' },
-  LEAGUE: { name: 'NBA League Pass',url: 'https://www.nba.com/watch',         color: '#1D428A' },
-  PEACOCK:{ name: 'Peacock',        url: 'https://www.peacocktv.com/sports',  color: '#000000' },
+const PLATFORM_META = {
+  'ESPN':        { url: 'https://www.espn.com/watch',          color: '#E60000' },
+  'ESPN2':       { url: 'https://www.espn.com/watch',          color: '#E60000' },
+  'ABC':         { url: 'https://www.espn.com/watch',          color: '#006AB3' },
+  'TNT':         { url: 'https://www.tntdrama.com/sports',     color: '#E4002B' },
+  'TBS':         { url: 'https://www.tbs.com/sports',          color: '#E4002B' },
+  'truTV':       { url: 'https://www.trutv.com',               color: '#E4002B' },
+  'NBC':         { url: 'https://www.nbc.com/live',            color: '#0A5FA8' },
+  'Peacock':     { url: 'https://www.peacocktv.com/sports',    color: '#2C2C2C' },
+  'Max':         { url: 'https://www.max.com/sports',          color: '#002BE7' },
+  'NBA TV':      { url: 'https://www.nba.com/watch',           color: '#1D428A' },
+  'NBA League Pass': { url: 'https://www.nba.com/watch',       color: '#1D428A' },
 };
 
-// Playoff schedule broadcast rotation (simplified — real apps would pull from SportRadar/NBA API)
-// Pattern: TNT gets Mon/Thu prime, ESPN/ABC gets Tue/Fri/Sun, Saturday split
-function getBroadcasters(game) {
-  const date = new Date(game.scheduled);
-  const day = date.getDay(); // 0=Sun,1=Mon,...,6=Sat
-  const hour = date.getHours(); // UTC
-
-  // Always include League Pass as backup
-  const base = [BROADCAST_MAP.LEAGUE];
-
-  if (day === 1 || day === 4) {
-    // Monday / Thursday → TNT
-    return [BROADCAST_MAP.TNT, ...base];
-  } else if (day === 2 || day === 5) {
-    // Tuesday / Friday → ESPN
-    return [BROADCAST_MAP.ESPN, ...base];
-  } else if (day === 0) {
-    // Sunday → ABC
-    return [BROADCAST_MAP.ABC, ...base];
-  } else if (day === 6) {
-    // Saturday → ABC early / TNT late
-    return hour < 22 ? [BROADCAST_MAP.ABC, ...base] : [BROADCAST_MAP.TNT, ...base];
-  } else {
-    // Wednesday → ESPN or TNT depending on game slot
-    return hour < 22 ? [BROADCAST_MAP.ESPN, ...base] : [BROADCAST_MAP.TNT, ...base];
+function getPlatformMeta(name) {
+  for (const [key, val] of Object.entries(PLATFORM_META)) {
+    if (name.toLowerCase().includes(key.toLowerCase()) ||
+        key.toLowerCase().includes(name.toLowerCase())) {
+      return { name: key, ...val };
+    }
   }
+  return { name, url: 'https://www.nba.com/watch', color: '#1D428A' };
 }
 
-// ─── SportRadar proxy ─────────────────────────────────────────────────────────
-// We pull from the free SportRadar trial endpoint. In production replace with
-// your paid key. Set SPORTRADAR_KEY in your environment.
-const SR_KEY = process.env.SPORTRADAR_KEY || 'DEMO_KEY';
-const SR_BASE = 'https://api.sportradar.com/nba/trial/v8/en';
+let cache = { data: null, ts: 0 };
+const CACHE_TTL = 60 * 1000;
 
-async function fetchFromSR(path) {
-  const url = `${SR_BASE}${path}?api_key=${SR_KEY}`;
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!res.ok) throw new Error(`SR ${res.status}: ${res.statusText}`);
+async function fetchGamesFromESPN() {
+  const url = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard';
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+      'Accept': 'application/json',
+    }
+  });
+  if (!res.ok) throw new Error(`ESPN API error: ${res.status}`);
   return res.json();
 }
 
-// ─── Cache ────────────────────────────────────────────────────────────────────
-let cache = { data: null, ts: 0 };
-const CACHE_TTL = 90 * 1000; // 90 seconds — keeps live scores fresh
+function parseESPN(data) {
+  return (data.events || []).map(event => {
+    const comp       = event.competitions[0];
+    const status     = comp.status;
+    const statusType = status.type;
+
+    const homeTeam = comp.competitors.find(c => c.homeAway === 'home');
+    const awayTeam = comp.competitors.find(c => c.homeAway === 'away');
+
+    const home = homeTeam?.team?.abbreviation || 'TBD';
+    const away = awayTeam?.team?.abbreviation || 'TBD';
+
+    let gameStatus = 'scheduled';
+    if (statusType.state === 'in')        gameStatus = 'inprogress';
+    else if (statusType.state === 'post') gameStatus = 'closed';
+
+    let score = null;
+    if (gameStatus === 'inprogress' || gameStatus === 'closed') {
+      score = {
+        [home]: parseInt(homeTeam?.score || '0', 10),
+        [away]: parseInt(awayTeam?.score || '0', 10),
+      };
+    }
+
+    const period = status.period || null;
+    const clock  = status.displayClock || null;
+
+    let quarterLabel = null;
+    if (gameStatus === 'inprogress' && period) {
+      if (statusType.description === 'Halftime') {
+        quarterLabel = 'Half';
+      } else {
+        quarterLabel = period > 4 ? `OT${period - 4 > 1 ? period - 4 : ''}` : `Q${period}`;
+      }
+    }
+
+    const broadcasts = comp.broadcasts || [];
+    const streams = [];
+    const seen = new Set();
+    broadcasts.forEach(b => {
+      (b.names || []).forEach(name => {
+        if (!seen.has(name)) {
+          seen.add(name);
+          streams.push(getPlatformMeta(name));
+        }
+      });
+    });
+    if (!seen.has('NBA League Pass')) {
+      streams.push(getPlatformMeta('NBA League Pass'));
+    }
+
+    const scheduledDate = new Date(comp.date || event.date);
+    const localTime = scheduledDate.toLocaleTimeString('en-US', {
+      timeZone: 'America/New_York',
+      hour: 'numeric', minute: '2-digit', hour12: true
+    }) + ' ET';
+
+    const notes = comp.notes || [];
+    const seriesInfo = notes.find(n => n.type === 'event')?.headline || null;
+
+    return {
+      id:        comp.id || event.id,
+      home,
+      away,
+      homeName:  homeTeam?.team?.displayName || home,
+      awayName:  awayTeam?.team?.displayName || away,
+      status:    gameStatus,
+      scheduled: comp.date || event.date,
+      localTime,
+      quarter:   quarterLabel,
+      clock,
+      score,
+      streams,
+      seriesInfo,
+    };
+  });
+}
 
 async function getSchedule() {
   const now = Date.now();
   if (cache.data && now - cache.ts < CACHE_TTL) return cache.data;
-
-  // Get today's date in Eastern time (NBA schedule runs on ET)
-  const et = new Date().toLocaleDateString('en-US', {
-    timeZone: 'America/New_York',
-    year: 'numeric', month: '2-digit', day: '2-digit'
-  });
-  const [m, d, y] = et.split('/');
-  const dateStr = `${y}/${m}/${d}`;
-
-  let raw;
-  try {
-    raw = await fetchFromSR(`/games/${dateStr}/schedule.json`);
-  } catch (e) {
-    console.warn('SR fetch failed, using mock data:', e.message);
-    raw = getMockSchedule();
-  }
-
-  const games = (raw.games || []).map(g => {
-    const home = g.home?.alias || g.home?.abbr || 'TBD';
-    const away = g.away?.alias || g.away?.abbr || 'TBD';
-    const status = g.status; // scheduled | inprogress | closed
-    const scheduled = g.scheduled;
-
-    const entry = {
-      id: g.id,
-      home,
-      away,
-      homeName: g.home?.name || home,
-      awayName: g.away?.name || away,
-      status,
-      scheduled,
-      localTime: formatET(scheduled),
-      streams: getBroadcasters({ scheduled }),
-      score: null,
-      clock: null,
-      quarter: null,
-    };
-
-    if (status === 'inprogress' || status === 'closed') {
-      entry.score = {
-        [home]: g.home_points ?? 0,
-        [away]: g.away_points ?? 0,
-      };
-      entry.clock = g.clock || null;
-      entry.quarter = g.quarter || null;
-    }
-
-    // Series info from brackets if available
-    entry.seriesInfo = g.playoff?.series_title || null;
-
-    return entry;
-  });
-
+  const raw   = await fetchGamesFromESPN();
+  const games = parseESPN(raw);
   cache = { data: games, ts: now };
   return games;
 }
 
-function formatET(isoString) {
-  if (!isoString) return '';
-  return new Date(isoString).toLocaleTimeString('en-US', {
-    timeZone: 'America/New_York',
-    hour: 'numeric', minute: '2-digit',
-    hour12: true
-  }) + ' ET';
-}
-
-// ─── Mock data (fallback when no API key) ─────────────────────────────────────
-function getMockSchedule() {
-  const today = new Date();
-  today.setHours(20, 0, 0, 0); // 8 PM ET base
-
-  const makeTime = (addHours) => {
-    const d = new Date(today);
-    d.setHours(d.getHours() + addHours);
-    return d.toISOString();
-  };
-
-  return {
-    games: [
-      {
-        id: 'mock-1',
-        home: { alias: 'ORL', name: 'Magic' },
-        away: { alias: 'DET', name: 'Pistons' },
-        status: 'inprogress',
-        scheduled: makeTime(0),
-        home_points: 61,
-        away_points: 56,
-        clock: '7:38',
-        quarter: 3,
-        playoff: { series_title: 'Game 4 — DET leads 2-1' }
-      },
-      {
-        id: 'mock-2',
-        home: { alias: 'PHX', name: 'Suns' },
-        away: { alias: 'OKC', name: 'Thunder' },
-        status: 'scheduled',
-        scheduled: makeTime(1.5),
-        playoff: { series_title: 'Game 4 — OKC leads 3-0' }
-      },
-      {
-        id: 'mock-3',
-        home: { alias: 'DEN', name: 'Nuggets' },
-        away: { alias: 'MIN', name: 'Timberwolves' },
-        status: 'scheduled',
-        scheduled: makeTime(2.5),
-        playoff: { series_title: 'Game 5 — MIN leads 3-1' }
-      }
-    ]
-  };
-}
-
-// ─── Routes ───────────────────────────────────────────────────────────────────
 app.get('/api/games', async (req, res) => {
   try {
     const games = await getSchedule();
     res.json({ ok: true, games, updatedAt: new Date().toISOString() });
   } catch (err) {
-    console.error(err);
+    console.error('ESPN fetch error:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-// Serve PWA for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => console.log(`NBA Tracker running on port ${PORT}`));
+app.listen(PORT, () => console.log(`NBA Tracker on port ${PORT} — live data from ESPN`));
