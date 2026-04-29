@@ -132,15 +132,18 @@ function parseEvent(event, sport) {
   const broadcasts = comp.broadcasts || [];
   const streamable = [];
   const cableOnly  = [];
-  const seen = new Set();
+  const seenRaw      = new Set();
+  const seenResolved = new Set();
 
   for (const b of broadcasts) {
     for (const name of (b.names || [])) {
-      if (seen.has(name)) continue;
-      seen.add(name);
-      if (name === 'MLB.TV') continue; // handled as fallback
+      if (seenRaw.has(name)) continue;
+      seenRaw.add(name);
+      if (name === 'MLB.TV') continue; // handled as explicit fallback below
       const resolved = resolvePlatform(name, b.market);
       if (!resolved) continue;
+      if (seenResolved.has(resolved.name)) continue; // skip if same display name already added
+      seenResolved.add(resolved.name);
       if (resolved.cable) cableOnly.push(resolved);
       else streamable.push(resolved);
     }
@@ -151,8 +154,7 @@ function parseEvent(event, sport) {
   const fallback = sport === 'baseball'
     ? { name: 'MLB.TV', url: 'https://www.mlb.com/tv', color: '#002D72', cable: false }
     : { name: 'League Pass', url: 'https://www.nba.com/watch', color: '#1D428A', cable: false };
-  const alreadyHasFallback = streams.some(s => s.name === fallback.name);
-  if (!alreadyHasFallback) streams.push(fallback);
+  if (!seenResolved.has(fallback.name)) streams.push(fallback);
 
   // Local time
   const scheduledDate = new Date(comp.date || event.date);
@@ -206,4 +208,5 @@ app.get('/api/games', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Sports Tracker :${PORT}`));
+
 
