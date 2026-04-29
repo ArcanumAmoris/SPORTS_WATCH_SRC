@@ -392,11 +392,17 @@ function gameCard(g, idx) {
   const homeName = g.homeName?.split(' ').pop() || g.home;
 
   // Stream chips
-  const streamChips = (g.streams || []).map(s =>
-    `<a class="stream-link" href="${s.url}" target="_blank" rel="noopener noreferrer">
+  const streamChips = (g.streams || []).map(s => {
+    if (s.cable) {
+      return `<span class="stream-chip-cable">
+        <span class="platform-dot" style="background:${s.color}"></span>${s.name}
+        <span class="cable-tag">cable</span>
+      </span>`;
+    }
+    return `<a class="stream-link" href="${s.url}" target="_blank" rel="noopener noreferrer">
       <span class="platform-dot" style="background:${s.color}"></span>${s.name}
-    </a>`
-  ).join('');
+    </a>`;
+  }).join('');
 
   return `<div class="game-card${isLive ? ' live' : ''}" data-game-id="${g.id}" style="animation-delay:${idx * 50}ms">
     <div class="card-top">${statusBadge}${!isLive ? `<span class="game-time">${g.localTime}</span>` : ''}</div>
