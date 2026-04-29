@@ -1,0 +1,15 @@
+{
+  "appId": "com.gameday.app",
+  "appName": "Game Day",
+  "webDir": "public",
+  "server": {
+    "url": "https://sports-watch-src.vercel.app",
+    "cleartext": false
+  },
+  "ios": {
+    "contentInset": "always",
+    "allowsLinkPreview": false,
+    "scrollEnabled": false,
+    "backgroundColor": "#0a0a0f"
+  }
+}
