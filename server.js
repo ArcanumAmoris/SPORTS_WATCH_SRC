@@ -7,28 +7,27 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// ─── Full platform map with correct URLs ──────────────────────────────────────
+// ─── Full platform map with verified correct URLs ─────────────────────────────
 const PLATFORMS = {
-  'ESPN':                { name: 'ESPN',          url: 'https://www.espn.com/watch',                    color: '#E60000' },
-  'ESPN2':               { name: 'ESPN2',         url: 'https://www.espn.com/watch',                    color: '#E60000' },
-  'ESPN Unlmtd':         { name: 'ESPN+',         url: 'https://www.espn.com/watch',                    color: '#E60000' },
-  'ESPN+':               { name: 'ESPN+',         url: 'https://www.espn.com/watch',                    color: '#E60000' },
-  'ABC':                 { name: 'ABC',           url: 'https://abc.com/watch-live-tv',                 color: '#006AB3' },
-  'TNT':                 { name: 'TNT / Max',     url: 'https://www.max.com/sports',                    color: '#E4002B' },
-  'TBS':                 { name: 'TBS / Max',     url: 'https://www.max.com/sports',                    color: '#E4002B' },
-  'truTV':               { name: 'truTV / Max',   url: 'https://www.max.com/sports',                    color: '#E4002B' },
-  'Max':                 { name: 'Max',           url: 'https://www.max.com/sports',                    color: '#002BE7' },
-  'NBC':                 { name: 'NBC',           url: 'https://www.nbc.com/live',                      color: '#0A5FA8' },
-  'Peacock':             { name: 'Peacock',       url: 'https://www.peacocktv.com/sports',              color: '#000000' },
-  'NBA TV':              { name: 'NBA TV',        url: 'https://www.nba.com/watch',                     color: '#1D428A' },
-  'NBA League Pass':     { name: 'League Pass',   url: 'https://www.nba.com/watch',                     color: '#1D428A' },
-  'MLB.TV':              { name: 'MLB.TV',        url: 'https://www.mlb.com/tv',                        color: '#002D72' },
-  'TBS':                 { name: 'TBS / Max',     url: 'https://www.max.com/sports',                    color: '#E4002B' },
-  'FS1':                 { name: 'Fox Sports 1',  url: 'https://www.foxsports.com/live',                color: '#E4002B' },
-  'FS2':                 { name: 'Fox Sports 2',  url: 'https://www.foxsports.com/live',                color: '#E4002B' },
-  'Prime Video':         { name: 'Prime Video',   url: 'https://www.amazon.com/primevideo',             color: '#00A8E1' },
-  'Apple TV+':           { name: 'Apple TV+',     url: 'https://tv.apple.com',                          color: '#444444' },
-  'fubo':                { name: 'FuboTV',        url: 'https://www.fubo.tv',                           color: '#E4002B' },
+  'ESPN':            { name: 'ESPN',         url: 'https://www.espn.com/watch',              color: '#E60000' },
+  'ESPN2':           { name: 'ESPN2',        url: 'https://www.espn.com/watch',              color: '#E60000' },
+  'ESPN Unlmtd':     { name: 'ESPN+',        url: 'https://www.espn.com/watch',              color: '#E60000' },
+  'ESPN+':           { name: 'ESPN+',        url: 'https://www.espn.com/watch',              color: '#E60000' },
+  'ABC':             { name: 'ABC',          url: 'https://abc.com/watch-live',              color: '#006AB3' },
+  'TNT':             { name: 'TNT / Max',    url: 'https://www.max.com/sports',              color: '#E4002B' },
+  'TBS':             { name: 'TBS / Max',    url: 'https://www.max.com/sports',              color: '#E4002B' },
+  'truTV':           { name: 'truTV / Max',  url: 'https://www.max.com/sports',              color: '#E4002B' },
+  'Max':             { name: 'Max',          url: 'https://www.max.com/sports',              color: '#002BE7' },
+  'NBC':             { name: 'NBC',          url: 'https://www.nbc.com/nbc-sports',          color: '#0A5FA8' },
+  'Peacock':         { name: 'Peacock',      url: 'https://www.peacocktv.com/watch/sports',  color: '#000000' },
+  'NBA TV':          { name: 'NBA TV',       url: 'https://www.nba.com/watch',               color: '#1D428A' },
+  'NBA League Pass': { name: 'League Pass',  url: 'https://www.nba.com/watch',               color: '#1D428A' },
+  'MLB.TV':          { name: 'MLB.TV',       url: 'https://www.mlb.com/tv',                  color: '#002D72' },
+  'FS1':             { name: 'Fox Sports 1', url: 'https://www.foxsports.com/live',          color: '#E4002B' },
+  'FS2':             { name: 'Fox Sports 2', url: 'https://www.foxsports.com/live',          color: '#E4002B' },
+  'Prime Video':     { name: 'Prime Video',  url: 'https://www.amazon.com/gp/video/storefront', color: '#00A8E1' },
+  'Apple TV+':       { name: 'Apple TV+',    url: 'https://tv.apple.com',                    color: '#444444' },
+  'fubo':            { name: 'FuboTV',       url: 'https://www.fubo.tv',                     color: '#E4002B' },
 };
 
 // Regional channel → cable only, shown but not clickable
