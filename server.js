@@ -31,36 +31,44 @@ const PLATFORMS = {
   'fubo':                { name: 'FuboTV',        url: 'https://www.fubo.tv',                           color: '#E4002B' },
 };
 
-// Regional channel → correct streaming URL (MLB.TV carries regional games)
+// Regional channel → cable only, shown but not clickable
 const REGIONAL_PLATFORMS = {
-  'MASN':                { name: 'MASN',              url: 'https://www.mlb.com/tv', color: '#002D72' },
-  'NESN':                { name: 'NESN',              url: 'https://www.nesn.com',   color: '#002D72' },
-  'YES':                 { name: 'YES Network',       url: 'https://www.mlb.com/tv', color: '#002D72' },
-  'CHSN':                { name: 'Chicago SN',        url: 'https://www.mlb.com/tv', color: '#002D72' },
-  'Bally':               { name: 'FanDuel SN',        url: 'https://www.mlb.com/tv', color: '#002D72' },
-  'FanDuel':             { name: 'FanDuel SN',        url: 'https://www.mlb.com/tv', color: '#002D72' },
-  'Marquee':             { name: 'Marquee SN',        url: 'https://www.mlb.com/tv', color: '#002D72' },
-  'NBC Sports':          { name: 'NBC Sports RSN',    url: 'https://www.mlb.com/tv', color: '#002D72' },
-  'Space City':          { name: 'Space City HN',     url: 'https://www.mlb.com/tv', color: '#002D72' },
-  'Sportsnet':           { name: 'Sportsnet',         url: 'https://www.sportsnet.ca/live', color: '#002D72' },
+  'MASN':        { name: 'MASN',              color: '#888', cable: true },
+  'NESN':        { name: 'NESN',              color: '#888', cable: true },
+  'YES':         { name: 'YES Network',        color: '#888', cable: true },
+  'CHSN':        { name: 'Chicago SN',         color: '#888', cable: true },
+  'Bally':       { name: 'FanDuel SN',         color: '#888', cable: true },
+  'FanDuel':     { name: 'FanDuel SN',         color: '#888', cable: true },
+  'Marquee':     { name: 'Marquee SN',         color: '#888', cable: true },
+  'NBC Sports':  { name: 'NBC Sports RSN',     color: '#888', cable: true },
+  'Space City':  { name: 'Space City HN',      color: '#888', cable: true },
+  'Sportsnet':   { name: 'Sportsnet',          color: '#888', cable: true },
+  'Rangers':     { name: 'Rangers SN',         color: '#888', cable: true },
+  'SNY':         { name: 'SNY',                color: '#888', cable: true },
+  'KMSP':        { name: 'KMSP-TV',            color: '#888', cable: true },
+  'Gray Media':  { name: 'Gray Media',         color: '#888', cable: true },
+  'BravesVision':{ name: 'BravesVision',       color: '#888', cable: true },
 };
 
-function resolvePlatform(name) {
-  // Exact match first
-  if (PLATFORMS[name]) return { ...PLATFORMS[name] };
-  // Partial match on national platforms
+function resolvePlatform(name, market) {
+  // National streamable platforms — exact then partial
+  if (PLATFORMS[name]) return { ...PLATFORMS[name], cable: false };
   for (const [key, val] of Object.entries(PLATFORMS)) {
+    if (name.toLowerCase().includes(key.toLowerCase())) return { ...val, cable: false };
+  }
+  // Regional cable channels — partial match
+  for (const [key, val] of Object.entries(REGIONAL_PLATFORMS)) {
     if (name.toLowerCase().includes(key.toLowerCase())) return { ...val };
   }
-  // Partial match on regional
-  for (const [key, val] of Object.entries(REGIONAL_PLATFORMS)) {
-    if (name.toLowerCase().includes(key.toLowerCase())) return { name: val.name, url: val.url, color: val.color };
+  // Team-branded .TV → MLB.TV (streamable)
+  if (name.endsWith('.TV')) {
+    return { name: 'MLB.TV', url: 'https://www.mlb.com/tv', color: '#002D72', cable: false };
   }
-  // Team-branded streaming (.TV suffix) → MLB.TV
-  if (name.endsWith('.TV') || name.includes('GuardianTV') || name.includes('RaysTV')) {
-    return { name: 'MLB.TV', url: 'https://www.mlb.com/tv', color: '#002D72' };
+  // Anything else from a non-national market = cable, show but no link
+  if (market && market !== 'national') {
+    return { name, color: '#888', cable: true };
   }
-  return null; // skip unknown
+  return null; // skip completely unknown national entries
 }
 
 // ─── ESPN fetch ───────────────────────────────────────────────────────────────
@@ -121,34 +129,29 @@ function parseEvent(event, sport) {
     }
   }
 
-  // ── Streams: national first, then one regional, then league fallback ─────────
+  // ── Streams: national streamable first, then cable channels, then league fallback ──
   const broadcasts = comp.broadcasts || [];
-  const nationalStreams = [];
-  const regionalStreams = [];
+  const streamable = [];
+  const cableOnly  = [];
   const seen = new Set();
 
-  // Separate national vs regional
   for (const b of broadcasts) {
-    const isNational = b.market === 'national';
     for (const name of (b.names || [])) {
       if (seen.has(name)) continue;
       seen.add(name);
-      const resolved = resolvePlatform(name);
+      if (name === 'MLB.TV') continue; // handled as fallback
+      const resolved = resolvePlatform(name, b.market);
       if (!resolved) continue;
-      // MLB.TV alone is not useful as "national" — treat as fallback
-      if (name === 'MLB.TV') continue;
-      if (isNational) nationalStreams.push(resolved);
-      else regionalStreams.push(resolved);
+      if (resolved.cable) cableOnly.push(resolved);
+      else streamable.push(resolved);
     }
   }
 
-  const streams = [...nationalStreams];
-  // Add one regional only if no national TV (common for MLB)
-  if (streams.length === 0 && regionalStreams.length > 0) streams.push(regionalStreams[0]);
-  // Always add league streaming service as last option
+  const streams = [...streamable, ...cableOnly];
+  // Always add league streaming fallback (streamable)
   const fallback = sport === 'baseball'
-    ? { name: 'MLB.TV', url: 'https://www.mlb.com/tv', color: '#002D72' }
-    : { name: 'League Pass', url: 'https://www.nba.com/watch', color: '#1D428A' };
+    ? { name: 'MLB.TV', url: 'https://www.mlb.com/tv', color: '#002D72', cable: false }
+    : { name: 'League Pass', url: 'https://www.nba.com/watch', color: '#1D428A', cable: false };
   streams.push(fallback);
 
   // Local time
@@ -203,3 +206,4 @@ app.get('/api/games', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Sports Tracker :${PORT}`));
+
