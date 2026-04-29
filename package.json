@@ -1,17 +1,21 @@
 {
-  "name": "nba-tracker",
+  "name": "gameday",
   "version": "1.0.0",
-  "description": "NBA game tracker PWA — follow your teams & find where to watch",
+  "description": "Game Day — Live scores & where to watch",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "build": "echo 'no build step'",
+    "cap:ios": "npx cap add ios && npx cap sync ios && npx cap open ios"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.19.2"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  }
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/ios": "^6.0.0"
+  },
+  "engines": { "node": ">=18.0.0" }
 }
