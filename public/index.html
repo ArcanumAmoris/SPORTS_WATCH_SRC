@@ -1,20 +1,51 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Sports Tracker" />
-  <meta name="theme-color" content="#0a0a0f" />
-  <meta name="description" content="Follow your NBA & MLB teams. See where to watch tonight." />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Sports Tracker"/>
+  <meta name="theme-color" content="#0a0a0f"/>
   <title>Sports Tracker</title>
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg"/>
+  <link rel="stylesheet" href="/style.css"/>
 </head>
 <body>
-<div id="app">
+
+<!-- ── ONBOARDING ─────────────────────────────────────────────────────────── -->
+<div id="onboarding" style="display:none">
+  <div class="ob-wrap">
+    <div class="ob-logo">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" fill="#C9082A"/>
+        <path d="M12 2v20M2 12h20M5.5 5.5c1.8 1.8 2.5 4.2 2.5 6.5s-.7 4.7-2.5 6.5M18.5 5.5C16.7 7.3 16 9.7 16 12s.7 4.7 2.5 6.5" stroke="white" stroke-width="1.2"/>
+        <circle cx="12" cy="12" r="10" stroke="white" stroke-width="1.2"/>
+      </svg>
+    </div>
+    <h1 class="ob-title">Sports Tracker</h1>
+    <p class="ob-sub">Follow your teams. Find out where to watch tonight.</p>
+
+    <div class="ob-league-tabs">
+      <button class="ob-league-btn active" id="ob-nba" onclick="obSetLeague('nba')">🏀 NBA</button>
+      <button class="ob-league-btn" id="ob-mlb" onclick="obSetLeague('mlb')">⚾ MLB</button>
+    </div>
+
+    <p class="ob-hint">Tap your teams — pick as many as you want</p>
+    <div class="ob-team-grid" id="obTeamGrid"></div>
+
+    <div class="ob-footer">
+      <div class="ob-selected-count" id="obCount">0 teams selected</div>
+      <button class="ob-done-btn" id="obDoneBtn" onclick="finishOnboarding()">
+        Get Started →
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MAIN APP ───────────────────────────────────────────────────────────── -->
+<div id="app" style="display:none">
 
   <header class="top-bar">
     <div class="logo">
@@ -39,24 +70,18 @@
     </div>
   </header>
 
-  <!-- League switcher -->
   <div class="league-switcher">
-    <button class="league-btn active" id="league-nba" onclick="setLeague('nba')">
-      <span class="league-icon">🏀</span> NBA
-    </button>
-    <button class="league-btn" id="league-mlb" onclick="setLeague('mlb')">
-      <span class="league-icon">⚾</span> MLB
-    </button>
+    <button class="league-btn active" id="league-nba" onclick="setLeague('nba')">🏀 NBA</button>
+    <button class="league-btn" id="league-mlb" onclick="setLeague('mlb')">⚾ MLB</button>
   </div>
 
   <div class="scroll-body">
-
     <section class="section">
       <div class="section-head">
         <span class="section-title" id="teamSectionTitle">YOUR TEAMS</span>
-        <button class="text-btn" id="clearBtn" onclick="clearAll()">Clear</button>
+        <button class="text-btn" id="editBtn" onclick="openEdit()">Edit</button>
       </div>
-      <div class="team-grid" id="teamGrid"></div>
+      <div class="followed-chips" id="followedChips"></div>
     </section>
 
     <section class="section">
@@ -71,10 +96,22 @@
         <div class="loading-block"><div class="spinner"></div><span>Loading games…</span></div>
       </div>
     </section>
-
   </div>
   <div class="bottom-safe"></div>
 </div>
+
+<!-- ── EDIT TEAMS SHEET ───────────────────────────────────────────────────── -->
+<div id="editSheet" style="display:none">
+  <div class="sheet-backdrop" onclick="closeEdit()"></div>
+  <div class="sheet-panel">
+    <div class="sheet-header">
+      <span class="sheet-title" id="sheetTitle">Edit Teams</span>
+      <button class="sheet-done" onclick="closeEdit()">Done</button>
+    </div>
+    <div class="team-grid" id="teamGrid"></div>
+  </div>
+</div>
+
 <script src="/app.js"></script>
 </body>
 </html>
