@@ -147,11 +147,12 @@ function parseEvent(event, sport) {
   }
 
   const streams = [...streamable, ...cableOnly];
-  // Always add league streaming fallback (streamable)
+  // Add league streaming fallback only if not already present
   const fallback = sport === 'baseball'
     ? { name: 'MLB.TV', url: 'https://www.mlb.com/tv', color: '#002D72', cable: false }
     : { name: 'League Pass', url: 'https://www.nba.com/watch', color: '#1D428A', cable: false };
-  streams.push(fallback);
+  const alreadyHasFallback = streams.some(s => s.name === fallback.name);
+  if (!alreadyHasFallback) streams.push(fallback);
 
   // Local time
   const scheduledDate = new Date(comp.date || event.date);
