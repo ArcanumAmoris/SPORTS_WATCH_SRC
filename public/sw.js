@@ -1,4 +1,4 @@
-const CACHE = 'sports-tracker-v3';
+const CACHE = 'sports-tracker-v4';
 const ASSETS = ['/', '/index.html', '/app.js', '/style.css', '/manifest.json'];
 
 self.addEventListener('install', e => {
@@ -18,16 +18,14 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (url.pathname.startsWith('/api/')) {
-    e.respondWith(
-      fetch(e.request).catch(() =>
-        new Response(JSON.stringify({ ok: false, error: 'Offline' }), {
-          headers: { 'Content-Type': 'application/json' }
-        })
-      )
-    );
+    e.respondWith(fetch(e.request).catch(() =>
+      new Response(JSON.stringify({ ok: false, error: 'Offline' }), {
+        headers: { 'Content-Type': 'application/json' }
+      })
+    ));
     return;
   }
-  // Network first for HTML/JS/CSS so updates always get through
+  // Network first — always get fresh JS/CSS
   e.respondWith(
     fetch(e.request)
       .then(res => {
