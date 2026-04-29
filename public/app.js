@@ -393,10 +393,10 @@ function gameCard(g, idx) {
 
   // Stream chips
   const streamChips = (g.streams || []).map(s => {
-    if (s.cable) {
-      return `<span class="stream-chip-cable">
+    if (s.cable || isFinal) {
+      return `<span class="stream-chip-cable${isFinal ? ' chip-final' : ''}">
         <span class="platform-dot" style="background:${s.color}"></span>${s.name}
-        <span class="cable-tag">cable</span>
+        ${s.cable && !isFinal ? '<span class="cable-tag">cable</span>' : ''}
       </span>`;
     }
     return `<a class="stream-link" href="${s.url}" target="_blank" rel="noopener noreferrer">
@@ -419,7 +419,8 @@ function gameCard(g, idx) {
         ${homeRecord}
       </div>
     </div>
-    ${streamChips ? `<div class="streams-label">WATCH ON</div><div class="stream-list">${streamChips}</div>` : ''}
+    ${streamChips ? `<div class="streams-label">${isFinal ? 'AIRED ON' : 'WATCH ON'}</div><div class="stream-list">${streamChips}</div>` : ''}
     ${g.seriesInfo ? `<div class="series-line">${g.seriesInfo}</div>` : ''}
   </div>`;
 }
+
