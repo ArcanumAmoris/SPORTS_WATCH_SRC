@@ -333,3 +333,22 @@ body {
 
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
 .bottom-safe { height: env(safe-area-inset-bottom, 16px); }
+
+/* ── Cable-only channel chip (unclickable) ───────────────────────────────────── */
+.stream-chip-cable {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 999px;
+  border: 0.5px solid var(--border);
+  background: var(--bg2);
+  font-size: 12px; font-weight: 500;
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.7;
+}
+.cable-tag {
+  font-size: 9px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted); opacity: 0.7;
+  border: 0.5px solid var(--border2);
+  border-radius: 3px; padding: 1px 4px;
+}
