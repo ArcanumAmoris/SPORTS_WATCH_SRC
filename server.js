@@ -7,45 +7,68 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// ─── Platform metadata ────────────────────────────────────────────────────────
-const PLATFORM_META = {
-  'ESPN':            { url: 'https://www.espn.com/watch',            color: '#E60000' },
-  'ESPN2':           { url: 'https://www.espn.com/watch',            color: '#E60000' },
-  'ABC':             { url: 'https://www.espn.com/watch',            color: '#006AB3' },
-  'TNT':             { url: 'https://www.tntdrama.com/sports',       color: '#E4002B' },
-  'TBS':             { url: 'https://www.tbs.com/sports',            color: '#E4002B' },
-  'truTV':           { url: 'https://www.trutv.com',                 color: '#E4002B' },
-  'NBC':             { url: 'https://www.nbc.com/live',              color: '#0A5FA8' },
-  'Peacock':         { url: 'https://www.peacocktv.com/sports',      color: '#2C2C2C' },
-  'Max':             { url: 'https://www.max.com/sports',            color: '#002BE7' },
-  'NBA TV':          { url: 'https://www.nba.com/watch',             color: '#1D428A' },
-  'NBA League Pass': { url: 'https://www.nba.com/watch',             color: '#1D428A' },
-  'MLB.TV':          { url: 'https://www.mlb.com/tv',                color: '#002D72' },
-  'FS1':             { url: 'https://www.foxsports.com/live',        color: '#E4002B' },
-  'FS2':             { url: 'https://www.foxsports.com/live',        color: '#E4002B' },
-  'Apple TV+':       { url: 'https://tv.apple.com',                  color: '#555'    },
+// ─── Full platform map with correct URLs ──────────────────────────────────────
+const PLATFORMS = {
+  'ESPN':                { name: 'ESPN',          url: 'https://www.espn.com/watch',                    color: '#E60000' },
+  'ESPN2':               { name: 'ESPN2',         url: 'https://www.espn.com/watch',                    color: '#E60000' },
+  'ESPN Unlmtd':         { name: 'ESPN+',         url: 'https://www.espn.com/watch',                    color: '#E60000' },
+  'ESPN+':               { name: 'ESPN+',         url: 'https://www.espn.com/watch',                    color: '#E60000' },
+  'ABC':                 { name: 'ABC',           url: 'https://abc.com/watch-live-tv',                 color: '#006AB3' },
+  'TNT':                 { name: 'TNT / Max',     url: 'https://www.max.com/sports',                    color: '#E4002B' },
+  'TBS':                 { name: 'TBS / Max',     url: 'https://www.max.com/sports',                    color: '#E4002B' },
+  'truTV':               { name: 'truTV / Max',   url: 'https://www.max.com/sports',                    color: '#E4002B' },
+  'Max':                 { name: 'Max',           url: 'https://www.max.com/sports',                    color: '#002BE7' },
+  'NBC':                 { name: 'NBC',           url: 'https://www.nbc.com/live',                      color: '#0A5FA8' },
+  'Peacock':             { name: 'Peacock',       url: 'https://www.peacocktv.com/sports',              color: '#000000' },
+  'NBA TV':              { name: 'NBA TV',        url: 'https://www.nba.com/watch',                     color: '#1D428A' },
+  'NBA League Pass':     { name: 'League Pass',   url: 'https://www.nba.com/watch',                     color: '#1D428A' },
+  'MLB.TV':              { name: 'MLB.TV',        url: 'https://www.mlb.com/tv',                        color: '#002D72' },
+  'TBS':                 { name: 'TBS / Max',     url: 'https://www.max.com/sports',                    color: '#E4002B' },
+  'FS1':                 { name: 'Fox Sports 1',  url: 'https://www.foxsports.com/live',                color: '#E4002B' },
+  'FS2':                 { name: 'Fox Sports 2',  url: 'https://www.foxsports.com/live',                color: '#E4002B' },
+  'Prime Video':         { name: 'Prime Video',   url: 'https://www.amazon.com/primevideo',             color: '#00A8E1' },
+  'Apple TV+':           { name: 'Apple TV+',     url: 'https://tv.apple.com',                          color: '#444444' },
+  'fubo':                { name: 'FuboTV',        url: 'https://www.fubo.tv',                           color: '#E4002B' },
 };
 
-function getPlatformMeta(name) {
-  for (const [key, val] of Object.entries(PLATFORM_META)) {
-    if (name.toLowerCase().includes(key.toLowerCase()) ||
-        key.toLowerCase().includes(name.toLowerCase())) {
-      return { name: key, ...val };
-    }
+// Regional channel → correct streaming URL (MLB.TV carries regional games)
+const REGIONAL_PLATFORMS = {
+  'MASN':                { name: 'MASN',              url: 'https://www.mlb.com/tv', color: '#002D72' },
+  'NESN':                { name: 'NESN',              url: 'https://www.nesn.com',   color: '#002D72' },
+  'YES':                 { name: 'YES Network',       url: 'https://www.mlb.com/tv', color: '#002D72' },
+  'CHSN':                { name: 'Chicago SN',        url: 'https://www.mlb.com/tv', color: '#002D72' },
+  'Bally':               { name: 'FanDuel SN',        url: 'https://www.mlb.com/tv', color: '#002D72' },
+  'FanDuel':             { name: 'FanDuel SN',        url: 'https://www.mlb.com/tv', color: '#002D72' },
+  'Marquee':             { name: 'Marquee SN',        url: 'https://www.mlb.com/tv', color: '#002D72' },
+  'NBC Sports':          { name: 'NBC Sports RSN',    url: 'https://www.mlb.com/tv', color: '#002D72' },
+  'Space City':          { name: 'Space City HN',     url: 'https://www.mlb.com/tv', color: '#002D72' },
+  'Sportsnet':           { name: 'Sportsnet',         url: 'https://www.sportsnet.ca/live', color: '#002D72' },
+};
+
+function resolvePlatform(name) {
+  // Exact match first
+  if (PLATFORMS[name]) return { ...PLATFORMS[name] };
+  // Partial match on national platforms
+  for (const [key, val] of Object.entries(PLATFORMS)) {
+    if (name.toLowerCase().includes(key.toLowerCase())) return { ...val };
   }
-  const isRegional = name.includes('.TV') || name.match(/^[A-Z]{2,5}SN/) || name.includes('NESN') || name.includes('CHSN');
-  return { name, url: isRegional ? 'https://www.mlb.com/tv' : 'https://www.espn.com/watch', color: '#666' };
+  // Partial match on regional
+  for (const [key, val] of Object.entries(REGIONAL_PLATFORMS)) {
+    if (name.toLowerCase().includes(key.toLowerCase())) return { name: val.name, url: val.url, color: val.color };
+  }
+  // Team-branded streaming (.TV suffix) → MLB.TV
+  if (name.endsWith('.TV') || name.includes('GuardianTV') || name.includes('RaysTV')) {
+    return { name: 'MLB.TV', url: 'https://www.mlb.com/tv', color: '#002D72' };
+  }
+  return null; // skip unknown
 }
 
 // ─── ESPN fetch ───────────────────────────────────────────────────────────────
-const ESPN_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
-  'Accept': 'application/json',
-};
+const ESPN_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)';
 
 async function espnFetch(sport, league) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/scoreboard`;
-  const res = await fetch(url, { headers: ESPN_HEADERS });
+  const res = await fetch(url, { headers: { 'User-Agent': ESPN_UA, 'Accept': 'application/json' } });
   if (!res.ok) throw new Error(`ESPN ${league} ${res.status}`);
   return res.json();
 }
@@ -61,17 +84,18 @@ function parseEvent(event, sport) {
   const away = awayTeam?.team?.abbreviation || 'TBD';
 
   let gameStatus = 'scheduled';
-  if (statusType.state === 'in')         gameStatus = 'inprogress';
-  else if (statusType.state === 'post')  gameStatus = 'closed';
+  if (statusType.state === 'in')        gameStatus = 'inprogress';
+  else if (statusType.state === 'post') gameStatus = 'closed';
 
   let score = null;
-  if (gameStatus === 'inprogress' || gameStatus === 'closed') {
+  if (gameStatus !== 'scheduled') {
     score = {
       [home]: parseInt(homeTeam?.score || '0', 10),
       [away]: parseInt(awayTeam?.score || '0', 10),
     };
   }
 
+  // Period label
   const period = status.period || null;
   let periodLabel = null;
   if (gameStatus === 'inprogress' && period) {
@@ -81,11 +105,11 @@ function parseEvent(event, sport) {
     } else if (sport === 'baseball') {
       const desc = (statusType.description || '').toLowerCase();
       const half = desc.includes('bottom') ? '▼' : '▲';
-      periodLabel = `${half}${period}`;
-      if (desc.includes('middle') || desc.includes('end')) periodLabel = `Mid ${period}`;
+      periodLabel = desc.includes('middle') || desc.includes('end') ? `Mid ${period}` : `${half}${period}`;
     }
   }
 
+  // MLB situation
   let situation = null;
   if (sport === 'baseball' && gameStatus === 'inprogress') {
     const sit = comp.situation || {};
@@ -97,28 +121,37 @@ function parseEvent(event, sport) {
     }
   }
 
-  // Broadcasts — national first, then fallback
+  // ── Streams: national first, then one regional, then league fallback ─────────
   const broadcasts = comp.broadcasts || [];
-  const streams = [];
+  const nationalStreams = [];
+  const regionalStreams = [];
   const seen = new Set();
-  const regional = [];
 
-  broadcasts.forEach(b => {
-    (b.names || []).forEach(name => {
-      if (seen.has(name)) return;
+  // Separate national vs regional
+  for (const b of broadcasts) {
+    const isNational = b.market === 'national';
+    for (const name of (b.names || [])) {
+      if (seen.has(name)) continue;
       seen.add(name);
-      const meta = getPlatformMeta(name);
-      const isRegional = name.includes('.TV') || name.match(/^[A-Z]{2,5}SN/) ||
-        name.includes('NESN') || name.includes('CHSN') || name.includes('FanDuel SN');
-      if (isRegional) regional.push(meta);
-      else streams.push(meta);
-    });
-  });
+      const resolved = resolvePlatform(name);
+      if (!resolved) continue;
+      // MLB.TV alone is not useful as "national" — treat as fallback
+      if (name === 'MLB.TV') continue;
+      if (isNational) nationalStreams.push(resolved);
+      else regionalStreams.push(resolved);
+    }
+  }
 
-  const fallbackName = sport === 'baseball' ? 'MLB.TV' : 'NBA League Pass';
-  if (!seen.has(fallbackName)) streams.push(getPlatformMeta(fallbackName));
-  if (streams.length <= 1 && regional.length > 0) streams.unshift(regional[0]);
+  const streams = [...nationalStreams];
+  // Add one regional only if no national TV (common for MLB)
+  if (streams.length === 0 && regionalStreams.length > 0) streams.push(regionalStreams[0]);
+  // Always add league streaming service as last option
+  const fallback = sport === 'baseball'
+    ? { name: 'MLB.TV', url: 'https://www.mlb.com/tv', color: '#002D72' }
+    : { name: 'League Pass', url: 'https://www.nba.com/watch', color: '#1D428A' };
+  streams.push(fallback);
 
+  // Local time
   const scheduledDate = new Date(comp.date || event.date);
   const localTime = scheduledDate.toLocaleTimeString('en-US', {
     timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', hour12: true
@@ -127,15 +160,22 @@ function parseEvent(event, sport) {
   const notes = comp.notes || [];
   const seriesInfo = notes.find(n => n.type === 'event')?.headline || null;
 
-  return { id: comp.id || event.id, sport, home, away,
+  return {
+    id: comp.id || event.id, sport, home, away,
     homeName: homeTeam?.team?.displayName || home,
     awayName: awayTeam?.team?.displayName || away,
+    homeRecord: homeTeam?.records?.[0]?.summary || null,
+    awayRecord: awayTeam?.records?.[0]?.summary || null,
     status: gameStatus, scheduled: comp.date || event.date,
-    localTime, periodLabel, score, situation, streams, seriesInfo };
+    localTime, periodLabel, score, situation, streams, seriesInfo,
+  };
 }
 
 // ─── Cache ────────────────────────────────────────────────────────────────────
-const caches = { basketball: { data: null, ts: 0 }, baseball: { data: null, ts: 0 } };
+const caches = {
+  basketball: { data: null, ts: 0 },
+  baseball:   { data: null, ts: 0 },
+};
 const CACHE_TTL = 60 * 1000;
 
 async function getGames(sport, league) {
@@ -148,7 +188,7 @@ async function getGames(sport, league) {
   return c.data;
 }
 
-// ─── API route ────────────────────────────────────────────────────────────────
+// ─── Routes ───────────────────────────────────────────────────────────────────
 app.get('/api/games', async (req, res) => {
   try {
     const [nba, mlb] = await Promise.all([
