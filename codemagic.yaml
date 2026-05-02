@@ -10,11 +10,11 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.sports.gameday
+        bundle_identifier: com.sportsgameday.live2026
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
-        BUNDLE_ID: "com.sports.gameday"
+        BUNDLE_ID: "com.sportsgameday.live2026"
       node: 20
       xcode: latest
       cocoapods: default
