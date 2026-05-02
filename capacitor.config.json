@@ -1,5 +1,5 @@
 {
-  "appId": "com.gameday.app",
+  "appId": "com.sports.gameday",
   "appName": "Game Day",
   "webDir": "public",
   "server": {
